@@ -1,5 +1,5 @@
 avl:
-	clang++ --std=c++23 avl.cpp && ./a.out
+	clang++ --std=c++23 -O3 avl.cpp -o avl && ./avl
 
 hash:
 	clang++ --std=c++23 hash.cpp && ./a.out
