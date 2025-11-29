@@ -1,9 +1,24 @@
+/** GRADER!
+ * READ THIS
+ *
+ * Only things that are different between these two files are that instead of
+ * AVL, it's hashmap. Everything else is kept the same, just with the names
+ * changed to be appropriate.
+ *
+ * AVL turns into HashTable (this is the only difference between the two!)
+ * AVLMap becomes HashMap (these implementations are exactly the same)
+ * main functions and everything else is exactly the same
+ *
+ */
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <fstream>
 #include <iostream>
-#include <numeric>
+#include <random>
 #include <stdexcept>
+#include <string>
 
 #define LENGTH 27
 /**
@@ -278,7 +293,7 @@ public:
   // this hack belongs in AVLMap. 0 value is ignored during find.
   // use V types default initialization (brace init for safe initialization)
   pair<K, V> *find(K k) { return imp.find({k, V{}}); }
-  void insert(K k, V v) { imp.insert({k, v}); }
+  pair<K, V> *insert(K k, V v) { return imp.insert({k, v}); }
   // hack
   void remove(K k) { imp.remove({k, V{}}); }
 };
@@ -288,10 +303,10 @@ private:
   // The problem here is 32 is the ASCII for Space, so we cannot just subtract a
   // 97. We need to account for the space somehow
   std::array<double, LENGTH> occurences{};
-  int window;
 
 public:
-  CharDistribution(std::string text, int window) : window(window) {
+  CharDistribution() {}
+  CharDistribution(std::string text) {
     for (char x : text) {
 
       // Subtract x - 96, the ascii for a - 1 (shift all the ascii characters
@@ -304,14 +319,50 @@ public:
     }
   }
 
+  void addLetter(char letter) {
+    int y = (letter - 96) < 0 ? 0 : letter - 96;
+    ++occurences[y];
+  }
+
+  char getRandom() {
+    double sum = 0;
+    for (const auto &c : occurences) {
+      sum += c;
+    }
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dist(1, sum);
+
+    int num = dist(gen);
+
+    for (int i = 0; i < occurences.size(); i++) {
+      if (occurences[i] == 0)
+        continue;
+      // for each number of occurences
+      num -= occurences[i];
+      if (num <= 0) {
+        if (i == 0)
+          return ' ';
+        return (char)(i + 96);
+      }
+    }
+    // this will never happen, theoretically
+    return '-';
+  }
+
   /**
    * Getting the percentage occurences of each character
    */
+  // NOTE: I DONT EVEN USE THIS
+  // i spent time doing this so i kept it in :(
   std::array<double, LENGTH>
   normalprobdist(const std::array<double, LENGTH> arr) {
     std::array<double, LENGTH> res;
 
-    double sum = std::reduce(arr.begin(), arr.end());
+    double sum = 0;
+    for (const auto &x : arr) {
+      sum += x;
+    }
     for (int i = 0; i < arr.size(); i++) {
       res[i] = arr[i] / sum;
     }
@@ -323,40 +374,97 @@ public:
 
 } // namespace m
 
+m::AVLMap<std::string, m::CharDistribution> *read_input(std::ifstream &in,
+                                                        int window_size) {
+  m::AVLMap<std::string, m::CharDistribution> *map =
+      new m::AVLMap<std::string, m::CharDistribution>();
+
+  std::string str;
+  getline(in, str);
+
+  for (int i = window_size; i < str.length(); i += 1) {
+    // go from i - window_size to i, and add the subsequent character to our
+    // entry
+    // create the string, and the char distribution
+    auto f = map->find(str.substr(i - window_size, window_size));
+
+    if (f == nullptr) {
+      m::CharDistribution t;
+      t.addLetter(str[i]);
+      map->insert(str.substr(i - window_size, window_size), t);
+
+    } else {
+      f->second.addLetter(str[i]);
+    }
+  }
+  return map;
+}
+
+void preprocess_input(std::ifstream &in) {
+  std::ofstream out;
+  out.open("preprocessed");
+
+  std::string line;
+  while (getline(in, line)) {
+    // replace all new line with space
+    out << line << ' ';
+  }
+}
+
+std::string generate_output(std::ifstream &in,
+                            m::AVLMap<std::string, m::CharDistribution> *map,
+                            int window_size, int output_size) {
+  in.clear();
+  in.seekg(0);
+
+  std::string line;
+  getline(in, line);
+  std::string starting_substr = line.substr(0, window_size);
+
+  // this is very inefficient, but no premade data structures so
+  // no stringstream :(
+  std::string ret = starting_substr;
+
+  while (ret.size() <= output_size) {
+    auto p = map->find(ret.substr(ret.size() - window_size, window_size));
+    if (!p) {
+      std::cerr << "EARLY EXIT, NO SUBSTR FOUND HERE" << std::endl;
+      return ret;
+    } else {
+      ret += p->second.getRandom();
+    }
+  }
+  return ret;
+}
+
 int main() {
 
-  // m::CharDistribution x(
-  //     "lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-  //     eiusmod " "tempor incididunt ut labore et dolore magna aliqua. Ut enim
-  //     ad minim " "veniam, quis nostrud exercitation ullamco laboris nisi ut
-  //     aliquip ex ea " "commodo consequat. Duis aute irure dolor in
-  //     reprehenderit in voluptate " "velit esse cillum dolore eu fugiat nulla
-  //     pariatur. Excepteur sint " "occaecat cupidatat non proident, sunt in
-  //     culpa qui officia deserunt " "mollit anim id est laborum", 12);
-  // auto arr = x.getOccurences();
-  // auto res = x.normalprobdist(arr);
-  //
-  // for (auto x : res) {
-  //   std::cout << x << std::endl;
-  // }
-  //
-  // auto sum = std::reduce(res.begin(), res.end());
-  // std::cout << "accum: " << sum << std::endl;
+  std::ifstream input;
+  input.open("merchant.txt");
 
-  m::AVLMap<int, int> map;
-  map.insert(5, 3);
-  map.insert(2, 3);
-  map.insert(1, 3);
-  map.insert(3, 3);
-  map.insert(4, 3);
-  map.insert(5, 4);
-  map.insert(7, 3);
+  if (input.is_open()) {
+    preprocess_input(input);
+    input.close();
+  }
+  input.open("preprocessed");
 
-  auto x = map.find(5);
+  std::cout << "Welcome to Anish's bootleg RNN!" << std::endl;
+  std::cout << "Please enter a window size: " << std::endl;
 
-  std::cout << x->second << std::endl;
+  int window_size;
+  std::cin >> window_size;
 
-  map.remove(20);
+  std::cout << "Great! Now enter an output size for your novel: " << std::endl;
 
+  int output_size;
+  std::cin >> output_size;
+
+  // this returns an AVLMap
+  const auto ret = read_input(input, window_size);
+  const std::string out = generate_output(input, ret, window_size, output_size);
+
+  std::cout << out << std::endl;
+
+  input.close();
   return 0;
 }
